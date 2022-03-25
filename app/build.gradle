@@ -1,10 +1,19 @@
 plugins {
     id 'java'
     id "com.github.johnrengelman.shadow" version "7.1.2"
+    id 'maven-publish'
+    id 'signing'
+    id 'jacoco'
 }
+
+group = "io.github.lkapitman"
+archivesBaseName = "rcon-protocol"
+description = "This is a library for the Source RCON Protocol"
+version = "1.2.0"
 
 repositories {
     mavenCentral()
+
 }
 
 dependencies {
@@ -21,4 +30,186 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+if (JavaVersion.current().isJava8Compatible()) {
+    allprojects {
+        tasks.withType(Javadoc) {
+            options.addStringOption('Xdoclint:none', '-quiet')
+        }
+    }
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "standardOut", "passed", "skipped", "failed"
+        showExceptions true
+        exceptionFormat "full"
+        showCauses true
+        showStackTraces true
+
+        afterSuite { desc, result ->
+            if (!desc.parent) { // will match the outermost suite
+                def output = "Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} successes, ${result.failedTestCount} failures, ${result.skippedTestCount} skipped)"
+                def startItem = '|  ', endItem = '  |'
+                def repeatLength = startItem.length() + output.length() + endItem.length()
+                println('\n' + ('-' * repeatLength) + '\n' + startItem + output + endItem + '\n' + ('-' * repeatLength))
+            }
+        }
+    }
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled false
+        csv.enabled false
+        html.enabled true
+    }
+}
+
+
+ext.admin = hasProperty('sonatypeUsername')
+
+artifacts {
+    archives jar
+    archives sourcesJar
+    archives javadocJar
+}
+
+signing {
+    required { admin }
+    sign configurations.archives
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            customizePom(pom, rootProject)
+
+            artifact sourcesJar
+            artifact javadocJar
+
+            if (admin) {
+                // sign the pom
+                pom.withXml {
+                    def pomFile = file("${project.buildDir}/generated-pom.xml")
+                    writeTo(pomFile)
+                    def pomAscFile = signing.sign(pomFile).signatureFiles[0]
+                    artifact(pomAscFile) {
+                        classifier = null
+                        extension = 'pom.asc'
+                    }
+                    pomFile.delete()
+                }
+
+                // sign the artifacts
+                project.tasks.signArchives.signatureFiles.each {
+                    artifact(it) {
+                        def matcher = it.file =~ /-(sources|javadoc|jre9)\.jar\.asc$/
+                        if (matcher.find()) {
+                            classifier = matcher.group(1)
+                        } else {
+                            classifier = null
+                        }
+                        extension = 'jar.asc'
+                    }
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2"
+            if (admin) {
+                credentials {
+                    username "okeyndell"
+                    password "sFa6cGeGCtdwJRL%"
+                }
+            }
+        }
+    }
+}
+
+model {
+    tasks.publishMavenJavaPublicationToMavenLocal {
+        dependsOn(project.tasks.signArchives)
+    }
+    tasks.publishMavenJavaPublicationToMavenRepository {
+        dependsOn(project.tasks.signArchives)
+    }
+    tasks.publish {
+        dependsOn(project.tasks.build)
+    }
+    tasks.install {
+        dependsOn(project.tasks.build)
+    }
+}
+
+
+def customizePom(pom, gradleProject) {
+    pom.withXml {
+        def root = asNode()
+
+        root.children().last() + {
+            resolveStrategy = Closure.DELEGATE_FIRST
+
+            name 'RconProtocol'
+            description gradleProject.description
+            url 'https://github.com/lkapitman/RconProtocol'
+            issueManagement {
+                system 'GitHub'
+                url 'https://github.com/lkapitman/RconProtocol/issues'
+            }
+            licenses {
+                license {
+                    name 'The MIT License'
+                    url 'https://github.com/igr/repo-url-parser/blob/master/LICENSE'
+                    distribution 'repo'
+                }
+            }
+            scm {
+                url 'https://github.com/lkapitman/RconProtocol'
+                connection 'https://github.com/lkapitman/RconProtocol.git'
+                developerConnection 'scm:git:ssh://git@github.com:lkapitman/RconProtocol.git'
+            }
+            developers {
+                developer {
+                    id 'okeyndell'
+                    name 'Lion Kapitman'
+                    email 'l.kapitman@gmail.com'
+                    timezone '+1'
+                }
+            }
+        }
+    }
+}
+
+task install(dependsOn: publishToMavenLocal) {
+    group = 'Publishing'
+    description = 'Installs artifacts to local Maven repository'
+}
+
+//
+// RELEASE
+//
+
+task release() {
+    group 'Project'
+    description 'Builds everything for the release.'
+
+    dependsOn build
+    dependsOn javadoc
+    dependsOn jacocoTestReport
 }
