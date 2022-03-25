@@ -1,4 +1,4 @@
-# rkon-core
+# RconProtocol
 
 This is a library for the [Source RCON Protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol), it is intended for raw use; there are no presets or built-in commands.
 
