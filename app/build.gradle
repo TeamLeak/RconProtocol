@@ -1,8 +1,6 @@
 plugins {
     id 'java'
     id "com.github.johnrengelman.shadow" version "7.1.2"
-    id 'maven-publish'
-    id 'signing'
     id 'jacoco'
 }
 
@@ -77,128 +75,10 @@ jacocoTestReport {
     }
 }
 
-
-ext.admin = hasProperty('sonatypeUsername')
-
 artifacts {
     archives jar
     archives sourcesJar
     archives javadocJar
-}
-
-signing {
-    required { admin }
-    sign configurations.archives
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-
-            customizePom(pom, rootProject)
-
-            artifact sourcesJar
-            artifact javadocJar
-
-            if (admin) {
-                // sign the pom
-                pom.withXml {
-                    def pomFile = file("${project.buildDir}/generated-pom.xml")
-                    writeTo(pomFile)
-                    def pomAscFile = signing.sign(pomFile).signatureFiles[0]
-                    artifact(pomAscFile) {
-                        classifier = null
-                        extension = 'pom.asc'
-                    }
-                    pomFile.delete()
-                }
-
-                // sign the artifacts
-                project.tasks.signArchives.signatureFiles.each {
-                    artifact(it) {
-                        def matcher = it.file =~ /-(sources|javadoc|jre9)\.jar\.asc$/
-                        if (matcher.find()) {
-                            classifier = matcher.group(1)
-                        } else {
-                            classifier = null
-                        }
-                        extension = 'jar.asc'
-                    }
-                }
-            }
-        }
-    }
-    repositories {
-        maven {
-            url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2"
-            if (admin) {
-                credentials {
-                    username "okeyndell"
-                    password "sFa6cGeGCtdwJRL%"
-                }
-            }
-        }
-    }
-}
-
-model {
-    tasks.publishMavenJavaPublicationToMavenLocal {
-        dependsOn(project.tasks.signArchives)
-    }
-    tasks.publishMavenJavaPublicationToMavenRepository {
-        dependsOn(project.tasks.signArchives)
-    }
-    tasks.publish {
-        dependsOn(project.tasks.build)
-    }
-    tasks.install {
-        dependsOn(project.tasks.build)
-    }
-}
-
-
-def customizePom(pom, gradleProject) {
-    pom.withXml {
-        def root = asNode()
-
-        root.children().last() + {
-            resolveStrategy = Closure.DELEGATE_FIRST
-
-            name 'RconProtocol'
-            description gradleProject.description
-            url 'https://github.com/lkapitman/RconProtocol'
-            issueManagement {
-                system 'GitHub'
-                url 'https://github.com/lkapitman/RconProtocol/issues'
-            }
-            licenses {
-                license {
-                    name 'The MIT License'
-                    url 'https://github.com/igr/repo-url-parser/blob/master/LICENSE'
-                    distribution 'repo'
-                }
-            }
-            scm {
-                url 'https://github.com/lkapitman/RconProtocol'
-                connection 'https://github.com/lkapitman/RconProtocol.git'
-                developerConnection 'scm:git:ssh://git@github.com:lkapitman/RconProtocol.git'
-            }
-            developers {
-                developer {
-                    id 'okeyndell'
-                    name 'Lion Kapitman'
-                    email 'l.kapitman@gmail.com'
-                    timezone '+1'
-                }
-            }
-        }
-    }
-}
-
-task install(dependsOn: publishToMavenLocal) {
-    group = 'Publishing'
-    description = 'Installs artifacts to local Maven repository'
 }
 
 //
