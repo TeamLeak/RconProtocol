@@ -3,6 +3,22 @@
 This is a library for the [Source RCON Protocol](https://developer.valvesoftware.com/wiki/Source_RCON_Protocol), it is intended for raw use; there are no presets or built-in commands.
 
 ## Usage
+
+#### Maven:
+```xml
+<dependency>
+  <groupId>io.github.lkapitman</groupId>
+  <artifactId>app</artifactId>
+  <version>1.2.0</version>
+</dependency>
+```
+#### Gradle:
+```groovy
+implementation 'io.github.lkapitman:app:1.2.0'
+```
+
+#### Examples:
+
 ```java
 // Connects to 127.0.0.1 on port 27015
 Rcon rcon = new Rcon("127.0.0.1", 27015, "mypassword".getBytes());
