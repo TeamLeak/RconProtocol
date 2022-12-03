@@ -32,4 +32,4 @@ System.out.println(result);
 When connecting to the rcon server, an `AuthenticationException` will be thrown if the password is incorrect.
 
 ## Download
-The latest packed .jar, ready to use as a library, is available [here](https://github.com/lkapitman/RconProtocol/releases).
+The latest packed .jar, ready to use as a library, is available [here](https://github.com/TeamLeak/RconProtocol/tags).
